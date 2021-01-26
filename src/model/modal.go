@@ -129,7 +129,7 @@ type CoreDataSource struct {
 
 type CoreGrained struct {
 	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Username string `gorm:"type:varchar(50);not null" json:"username"`
+	Username string `gorm:"type:varchar(50);not null;index:user_idx" json:"username"`
 	Group    JSON   `gorm:"type:json" json:"group"`
 }
 
@@ -167,7 +167,7 @@ type CoreAutoTask struct {
 	ID        uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	Name      string `gorm:"type:varchar(50);not null" json:"name"`
 	Source    string `gorm:"type:varchar(50);not null" json:"source"`
-	Base      string `gorm:"type:varchar(50);not null" json:"base"`
+	DataBase  string `gorm:"type:varchar(50);not null" json:"data_base"`
 	Table     string `gorm:"type:varchar(50);not null" json:"table"`
 	Tp        int    `gorm:"type:tinyint(2);not null" json:"tp"` // 0 insert 1 update 2delete
 	Affectrow uint   `gorm:"type:int(50);not null default 0;" json:"affect_rows"`

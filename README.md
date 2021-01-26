@@ -6,7 +6,7 @@
 
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.3.0-brightgreen.svg)
+![](https://img.shields.io/badge/version-v2.3.1-brightgreen.svg)
 
 ##### MYSQL web 端 SQL 审核平台。
 
@@ -106,4 +106,4 @@ E-mail: henry@yearning.io
 
 任何二次开发及二次开源项目请严格遵守相应开源许可
 
-2019 © Henry Yee
+2020 © Henry Yee

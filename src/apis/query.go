@@ -1,8 +1,10 @@
 package apis
 
 import (
-	"Yearning-go/src/handle"
-	"Yearning-go/src/handle/query"
+	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/fetch"
+	"Yearning-go/src/handler/personal"
+	"Yearning-go/src/lib"
 	"github.com/cookieY/yee"
 	"net/http"
 )
@@ -11,9 +13,9 @@ func YearningQueryForGet(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
 	case "fetch_table":
-		return query.FetchQueryTableInfo(y)
+		return personal.FetchQueryTableInfo(y)
 	case "table_info":
-		return query.FetchQueryTableStruct(y)
+		return personal.FetchQueryTableStruct(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
@@ -22,22 +24,23 @@ func YearningQueryForPut(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
 	case "fetch_base":
-		return query.FetchQueryDatabaseInfo(y)
+		return personal.FetchQueryDatabaseInfo(y)
 	case "status":
-		return query.FetchQueryStatus(y)
+		return personal.FetchQueryStatus(y)
 	case "merge":
-		return handle.GeneralMergeDDL(y)
+		return fetch.FetchMergeDDL(y)
 	}
-	return y.JSON(http.StatusOK, "Illegal")
+	return y.JSON(http.StatusOK,commom.ERR_REQ_FAKE)
 }
 
 func YearningQueryForPost(y yee.Context) (err error) {
 	tp := y.Params("tp")
+	user, _ := lib.JwtParse(y)
 	switch tp {
 	case "refer":
-		return query.ReferQueryOrder(y)
+		return personal.ReferQueryOrder(y,&user)
 	case "results":
-		return query.FetchQueryResults(y)
+		return personal.FetchQueryResults(y, &user)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
@@ -47,6 +50,6 @@ func YearningQueryApis() yee.RestfulAPI {
 		Get:    YearningQueryForGet,
 		Put:    YearningQueryForPut,
 		Post:   YearningQueryForPost,
-		Delete: query.UndoQueryOrder,
+		Delete: personal.UndoQueryOrder,
 	}
 }
