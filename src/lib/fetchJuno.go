@@ -18,6 +18,15 @@ var (
 	config          atomic.Value
 )
 
+const TIMEOUT = time.Second * 60
+
+type QueryDeal struct {
+	Sql              string   `json:"sql"`
+	DataBase         string   `json:"data_base"`
+	Source           string   `json:"source"`
+	InsulateWordList []string `json:"insulate_word_list"`
+}
+
 func FetchGRPCConn() (*grpc.ClientConn, error) {
 	if c := config.Load(); c != nil {
 		if c.(*grpc.ClientConn).GetState() == connectivity.Ready {
@@ -62,16 +71,15 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 	}
 
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
+	defer func() {
+		cancel()
+	}()
 	r, err := c.OrderDeal(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		return []*pb.Record{}, err
 	}
-	defer func() {
-		cancel()
-	}()
-
 	return r.Record, nil
 }
 
@@ -86,7 +94,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	}
 
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -94,6 +102,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		MessagePush(order.WorkId, 4, "")
+		return
 	}
 	MessagePush(order.WorkId, 1, "")
 }
@@ -110,7 +119,7 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 	// Set up a connection to the server.
 	c := pb.NewJunoClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -118,6 +127,7 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		MessagePush(order.WorkId, 4, "")
+		return
 	}
 	MessagePush(order.WorkId, 1, "")
 }
@@ -133,7 +143,7 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 
 	c := pb.NewJunoClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 
 	defer func() {
 		cancel()
@@ -145,22 +155,24 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 	return r.Ok
 }
 
-func ExQuery(order *pb.LibraAuditOrder) (*pb.InsulateWordList, error) {
+func (q *QueryDeal) Limit(order *pb.LibraAuditOrder) error {
 	conn, err := FetchGRPCConn()
 
 	if err != nil {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
 	r, err := c.Query(ctx, order)
 	if err != nil {
-		return r, err
+		return err
 	}
-	return r, nil
+	q.Sql = r.SQL
+	q.InsulateWordList = r.InsulateWordList
+	return nil
 }
 
 func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
@@ -170,7 +182,7 @@ func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -188,7 +200,7 @@ func OverrideConfig(order *pb.LibraAuditOrder) *pb.Isok {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()

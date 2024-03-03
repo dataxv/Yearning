@@ -13,11 +13,6 @@
 
 package parser
 
-import (
-	"github.com/jinzhu/gorm"
-	"github.com/pingcap/parser/types"
-)
-
 var FetchAuditRole AuditRole
 
 type Record struct {
@@ -29,16 +24,16 @@ type Record struct {
 }
 
 type AuditRole struct {
-	DMLInsertColumns               bool   //是否检查插入语句存在列名
-	DMLMaxInsertRows               int    //inert语句最大多少个字段
-	DMLWhere                       bool   //是否检查dml语句where条件
+	DMLAllowLimitSTMT              bool   `json:"DMLAllowLimitSTMT"` // 是否允许update/insert 语句使用limit关键字
+	DMLInsertColumns               bool   `json:"DMLInsertColumns"`  //是否检查插入语句存在列名
+	DMLMaxInsertRows               int    `json:"DMLMaxInsertRows"`  //inert语句最大多少个字段
+	DMLWhere                       bool   `json:"DMLWhere"`          //是否检查dml语句where条件
 	DMLOrder                       bool   // 是否检查dml语句order条件
 	DMLSelect                      bool   //是否检查dml语句有select语句
 	DDLCheckTableComment           bool   //是否检查表注释
 	DDlCheckColumnComment          bool   //是否检查列注释
 	DDLCheckColumnNullable         bool   //是否检查ddl语句有null值
 	DDLCheckColumnDefault          bool   //是否检查列默认值
-	DDLTimeFieldDefault            bool   //检测时间字段是否拥有默认值
 	DDLEnableAcrossDBRename        bool   //是否允许跨库表迁移
 	DDLEnableAutoincrementInit     bool   //是否强制自增列初始值为1
 	DDLEnableAutoIncrement         bool   //是否强制主键为自增列
@@ -64,6 +59,7 @@ type AuditRole struct {
 	DDLAllowPRINotInt              bool
 	DDLColumnsMustHaveIndex        string // 如果表包含以下列，列必须有索引。可指定多个列,以逗号分隔.列类型可选.   格式: 列名 [列类型,可选],...
 	DDLAllowChangeColumnPosition   bool   // ddl语句允许使用after/first
+	DDLCheckFloatDouble            bool   //float/double 类型 强制变更为decimal类型
 	IsOSC                          bool
 	OscBinDir                      string // pt-osc path
 	OscDropNewTable                bool
@@ -80,42 +76,33 @@ type AuditRole struct {
 	OscCriticalThreadRunning       int
 	OscPrintSql                    bool
 	OscChunkTime                   float32
+	OscChunkSize                   float32
 	OscSize                        uint
 	AllowCreateView                bool
 	AllowCreatePartition           bool
 	AllowSpecialType               bool
-	AllowForeignKey                bool
-	PRIRollBackErr                 bool
+	OscSleep                       float32
+	OscCheckUniqueKeyChange        bool
+	OscLockWaitTimeout             int
 }
 
 type IndexInfo struct {
-	gorm.Model
-
 	Table      string `gorm:"Column:Table"`
 	NonUnique  int    `gorm:"Column:Non_unique"`
 	IndexName  string `gorm:"Column:Key_name"`
 	Seq        int    `gorm:"Column:Seq_in_index"`
 	ColumnName string `gorm:"Column:Column_name"`
 	IndexType  string `gorm:"Column:Index_type"`
-
-	IsDeleted bool `gorm:"-"`
 }
 
 type FieldInfo struct {
-	gorm.Model
-
-	Field      string  `gorm:"Column:Field";json:"field"`
-	Type       string  `gorm:"Column:Type";json:"type"`
-	Collation  string  `gorm:"Column:Collation";json:"collation"`
-	Null       string  `gorm:"Column:Null";json:"null"`
-	Key        string  `gorm:"Column:Key";json:"key"`
-	Default    *string `gorm:"Column:Default";json:"default"`
-	Extra      string  `gorm:"Column:Extra";json:"extra"`
-	Privileges string  `gorm:"Column:Privileges";json:"privileges"`
-	Comment    string  `gorm:"Column:Comment";json:"comment"`
-
-	IsDeleted bool `gorm:"-"`
-	IsNew     bool `gorm:"-"`
-
-	Tp *types.FieldType `gorm:"-"`
+	Field      string  `gorm:"Column:Field" json:"field"`
+	Type       string  `gorm:"Column:Type" json:"type"`
+	Collation  string  `gorm:"Column:Collation" json:"collation"`
+	Null       string  `gorm:"Column:Null" json:"null"`
+	Key        string  `gorm:"Column:Key" json:"key"`
+	Default    *string `gorm:"Column:Default" json:"default"`
+	Extra      string  `gorm:"Column:Extra" json:"extra"`
+	Privileges string  `gorm:"Column:Privileges" json:"privileges"`
+	Comment    string  `gorm:"Column:Comment" json:"comment"`
 }

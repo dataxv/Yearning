@@ -110,7 +110,9 @@ func Migrate() {
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
-			AllowForeignKey:                false,
+			OscLockWaitTimeout:             60,
+			OscSleep:                       0.0,
+			OscCheckUniqueKeyChange:        false,
 		}
 
 		other := model.Other{
@@ -130,7 +132,7 @@ func Migrate() {
 			Url:      "",
 			User:     "",
 			Password: "",
-			Type:     1,
+			Type:     "(&(objectClass=organizationalPerson)(sAMAccountName=%s))",
 			Sc:       "",
 		}
 
@@ -176,11 +178,13 @@ func UpdateData() {
 	model.DB().AutoMigrate(&model.CoreRoleGroup{})
 	model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
 	model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+	model.DB().LogMode(false).Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
+	model.DB().LogMode(false).Model(&model.CoreAutoTask{}).DropColumn("base")
 	fmt.Println("数据已更新!")
 }
 
 func DelCol() {
-	model.DB().Model(&model.CoreQueryOrder{}).DropColumn("source")
+	model.DB().LogMode(false).Model(&model.CoreQueryOrder{}).DropColumn("source")
 }
 
 func MargeRuleGroup() {
@@ -190,5 +194,14 @@ func MargeRuleGroup() {
 	model.DB().Model(&model.CoreGrained{}).DropColumn("rule")
 	model.DB().Model(model.CoreAccount{}).Where("rule = ?", "perform").Update(&model.CoreAccount{Rule: "admin"})
 	model.DB().Model(model.CoreAccount{}).Where("username = ?", "admin").Update(&model.CoreAccount{Rule: "super"})
+	ldap := model.Ldap{
+		Url:      "",
+		User:     "",
+		Password: "",
+		Type:     "(&(objectClass=organizationalPerson)(sAMAccountName=%s))",
+		Sc:       "",
+	}
+	b, _ := json.Marshal(ldap)
+	model.DB().LogMode(false).Model(model.CoreGlobalConfiguration{}).Update(&model.CoreGlobalConfiguration{Ldap: b})
 	fmt.Println("修复成功!")
 }

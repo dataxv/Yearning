@@ -15,19 +15,20 @@ package lib
 
 import (
 	"Yearning-go/src/model"
-	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/cookieY/sqlx"
-	"github.com/cookieY/yee"
 	_ "github.com/go-sql-driver/mysql"
-	"gopkg.in/ldap.v3"
-	"log"
 	"math"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
+)
+
+const  (
+	BUF                     = 1<<20 - 1
 )
 
 func ResearchDel(s []string, p string) []string {
@@ -51,70 +52,6 @@ func Paging(page interface{}, total int) (start int, end int) {
 	start = i*total - total
 	end = total
 	return
-}
-
-func LdapConnenct(c yee.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
-
-	var s string
-	ld, err := ldap.Dial("tcp", l.Url)
-
-	if l.Ldaps {
-		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
-			log.Println(err.Error())
-		}
-	}
-
-	if err != nil {
-		c.Logger().Error(err.Error())
-		return false
-	}
-	defer ld.Close()
-
-	if ld != nil {
-		if err := ld.Bind(l.User, l.Password); err != nil {
-			return false
-		}
-		if isTest {
-			return true
-		}
-
-	}
-
-	if l.Type == 1 {
-		s = fmt.Sprintf("(sAMAccountName=%s)", user)
-	} else if l.Type == 2 {
-		s = fmt.Sprintf("(uid=%s)", user)
-	} else {
-		s = fmt.Sprintf("(cn=%s)", user)
-	}
-
-	searchRequest := ldap.NewSearchRequest(
-		l.Sc,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)%s)", s),
-		[]string{"dn"},
-		nil,
-	)
-
-	sr, err := ld.Search(searchRequest)
-
-	if err != nil {
-		log.Println(err.Error())
-		return false
-	}
-
-	if len(sr.Entries) != 1 {
-		log.Println("User does not exist or too many entries returned")
-		return false
-	}
-
-	userdn := sr.Entries[0].DN
-
-	if err := ld.Bind(userdn, pass); err != nil {
-		c.Logger().Error(err.Error())
-		return false
-	}
-	return true
 }
 
 func Axis() []string {
@@ -186,76 +123,81 @@ func TimeDifference(t string) bool {
 	return false
 }
 
-type querydata struct {
+type Query struct {
 	Field []map[string]string
 	Data  []map[string]interface{}
 }
 
-func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList []string) (querydata, error) {
+func (q *Query) QueryRun(source *model.CoreDataSource, deal *QueryDeal) error {
 
-	var qd querydata
+	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, Decrypt(source.Password), source.IP, source.Port, deal.DataBase))
 
-	ps := Decrypt(source.Password)
-
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.Basename))
 	if err != nil {
-		return qd, err
+		return err
 	}
 
 	defer db.Close()
 
-	rows, err := db.Queryx(req.Sql)
+	rows, err := db.Queryx(deal.Sql)
 
 	if err != nil {
-		return qd, err
+		return err
 	}
 
 	cols, err := rows.Columns()
 
 	if err != nil {
-		return qd, err
+		return err
 	}
+
 	defer rows.Close()
+
 	for rows.Next() {
 		results := make(map[string]interface{})
 		_ = rows.MapScan(results)
-		for idx := range results {
-			switch r := results[idx].(type) {
+		for key := range results {
+			switch r := results[key].(type) {
 			case []uint8:
-				if len(r) > 10000 {
-					results[idx] = "blob字段无法显示"
+				if len(r) > BUF {
+					results[key] = "blob字段无法显示"
 				} else {
-					if hex.EncodeToString(r) == "01" {
-						results[idx] = "true"
-					} else if hex.EncodeToString(r) == "00" {
-						results[idx] = "false"
-					} else {
-						results[idx] = string(r)
+					switch hex.EncodeToString(r) {
+					case "01":
+						results[key] = "true"
+					case "00":
+						results[key] = "false"
+					default:
+						results[key] = string(r)
+					}
+					if excludeFieldContext(key, deal) {
+						results[key] = "****脱敏字段"
 					}
 				}
 			}
 		}
-		if len(wordList) > 0 {
-			for ok := range results {
-				for _, exclude := range wordList {
-					if ok == exclude {
-						results[ok] = "****脱敏字段"
-					}
-				}
-			}
-		}
-
-		qd.Data = append(qd.Data, results)
+		q.Data = append(q.Data, results)
 	}
 
 	ele := removeDuplicateElement(cols)
 
-	for _, cv := range ele {
-		qd.Field = append(qd.Field, map[string]string{"title": cv, "key": cv, "width": "200"})
+	for cv := range ele {
+		q.Field = append(q.Field, map[string]string{"title": ele[cv], "key": ele[cv], "width": "200"})
 	}
-	qd.Field[0]["fixed"] = "left"
 
-	return qd, nil
+	q.Field[0]["fixed"] = "left"
+
+	return nil
+}
+
+func excludeFieldContext(field string, req *QueryDeal) bool {
+	if len(req.InsulateWordList) > 0 {
+		for _, exclude := range req.InsulateWordList {
+			if (strings.Contains(strings.ToLower(field), exclude) && strings.Contains(field, ")")) || strings.ToLower(field) == exclude {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func removeDuplicateElement(addrs []string) []string {
@@ -280,8 +222,6 @@ func JsonStringify(i interface{}) []byte {
 	return o
 }
 
-
-
 func removeDuplicateElementForRule(addrs []string) []string {
 	result := make([]string, 0, len(addrs))
 	temp := map[string]struct{}{}
@@ -294,12 +234,12 @@ func removeDuplicateElementForRule(addrs []string) []string {
 	return result
 }
 
-func MulitUserRuleMarge(group []string) model.PermissionList {
+func MultiUserRuleMarge(group []string) model.PermissionList {
 	var u model.PermissionList
 	for _, i := range group {
 		var k model.CoreRoleGroup
-		model.DB().Where("name =?", i).First(&k)
 		var m1 model.PermissionList
+		model.DB().Where("name =?", i).First(&k)
 		_ = json.Unmarshal(k.Permissions, &m1)
 		u.DDLSource = append(u.DDLSource, m1.DDLSource...)
 		u.DMLSource = append(u.DMLSource, m1.DMLSource...)
@@ -310,6 +250,10 @@ func MulitUserRuleMarge(group []string) model.PermissionList {
 	u.DMLSource = removeDuplicateElementForRule(u.DMLSource)
 	u.Auditor = removeDuplicateElementForRule(u.Auditor)
 	u.QuerySource = removeDuplicateElementForRule(u.QuerySource)
-
 	return u
+}
+
+func EmptyGroup() []byte {
+	group, _ := json.Marshal([]string{})
+	return group
 }

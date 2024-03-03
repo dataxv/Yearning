@@ -50,13 +50,14 @@ type Message struct {
 	Ding     bool   `json:"ding"`
 	Ssl      bool   `json:"ssl"`
 	PushType bool   `json:"push_type"`
+	Key      string `json:"key"`
 }
 
 type Ldap struct {
 	Url      string `json:"url"`
 	User     string `json:"user"`
 	Password string `json:"password"`
-	Type     int    `json:"type"`
+	Type     string `json:"type"`
 	Sc       string `json:"sc"`
 	Ldaps    bool   `json:"ldaps"`
 }
@@ -68,26 +69,8 @@ type PermissionList struct {
 	QuerySource []string `json:"query_source"`
 }
 
-type MargeList struct {
-	DDL         int      `json:"ddl"`
-	DDLSource   []string `json:"ddl_source"`
-	DML         int      `json:"dml"`
-	DMLSource   []string `json:"dml_source"`
-	User        int      `json:"user"`
-	Base        int      `json:"base"`
-	Auditor     []string `json:"auditor"`
-	Query       int      `json:"query"`
-	QuerySource []string `json:"query_source"`
-}
-
 type Permission struct {
 	Permissions PermissionList `json:"permissions"`
-}
-
-type Queryresults struct {
-	Sql      string
-	Basename string
-	Source   string
 }
 
 func DbInit(c string) {
